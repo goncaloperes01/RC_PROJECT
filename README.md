@@ -62,4 +62,4 @@ This project is being developed by a 7-member team:
 * **Development Team:** Dinis Madeira & Gabriel da Cruz
 
 ---
-*University of Coimbra - DEEC*
+*Universidade de Coimbra - DEEC*
