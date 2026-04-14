@@ -1,0 +1,103 @@
+ESTRUTURA DO PROJETO C-CORD
+
+1. Pasta principal: ccord/
+
+Esta é a diretoria principal (root) do projeto. Contém todos os componentes organizados de forma estruturada para facilitar o desenvolvimento e manutenção.
+
+_________________________________________________________________________________________________
+
+2. Pasta: server/
+
+Contém o código do servidor (server.c).
+
+Funções principais:
+
+Receber ligações de clientes
+Processar comandos enviados pelos clientes (REGISTER, LOGIN, ECHO, etc.)
+Gerir dados do sistema (utilizadores)
+
+O servidor é o componente central do sistema (modelo cliente-servidor).
+
+_________________________________________________________________________________________________
+
+
+3. Pasta: client/
+
+Contém o código do cliente (client.c).
+
+Funções principais:
+
+Interface com o utilizador (menus e interação)
+Envio de comandos para o servidor
+Receção e apresentação das respostas do servidor
+
+O cliente é o ponto de interação com o utilizador final.
+
+_________________________________________________________________________________________________
+
+
+4. Pasta: data/
+
+Contém ficheiros de dados persistentes.
+
+Exemplo:
+
+users.txt → armazena utilizadores e palavras-passe
+
+Função:
+
+Simular uma base de dados simples baseada em ficheiros
+
+_________________________________________________________________________________________________
+
+
+5. Pasta: docs/
+
+Reservada para documentação do projeto.
+
+Atualmente não está a ser utilizada, mas será importante para a entrega final.
+
+_________________________________________________________________________________________________
+
+
+6. Ficheiro: Makefile
+
+Ficheiro utilizado para automatizar a compilação do projeto.
+
+Objetivo:
+
+Compilar server e client com um único comando
+Evitar execução manual de comandos gcc
+
+Exemplo de uso futuro:
+
+make server
+make client
+
+Atualmente não está a ser utilizado, mas poderá ser integrado mais à frente.
+
+_________________________________________________________________________________________________
+
+
+7. Estado atual do projeto
+
+Já implementado:
+
+Comunicação cliente-servidor (TCP)
+Registo de utilizadores (REGISTER)
+Autenticação (LOGIN)
+Comando ECHO
+Comando GET_INFO
+Interface interativa no cliente
+
+
+_________________________________________________________________________________________________
+
+
+NOTA:
+
+A estrutura do projeto foi um extra que fiz apenas para ficar mais interativo, visualemente mais bonito e simples de utilizar e compreender, se acharem que não vale a pena por estar a "complicar" a defesa do mesmo digam e volto a colocar o código com um menu simples sem extras.
+
+
+
+
