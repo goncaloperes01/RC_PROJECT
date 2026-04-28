@@ -3,10 +3,10 @@
 **C-Cord** is a simplified, Discord-like client-server communication platform built in C. 
 This project is being developed for the **Computer Networks (Redes de Computadores)** course at the University of Coimbra (2025/2026).
 
-## 📌 Current State: Phase 2 (Command-Based Interaction)
+## Current State: Phase 2 (Command-Based Interaction)
 Currently, the project has advanced to **Phase 2**. It maintains a **Multi-Client / Single-Server model** using **Blocking Sockets**, utilizing a strict request-response data flow to manage state, persistence, and basic message routing before transitioning to multiplexing in Phase 3.
 
-### 🚀 Implemented Features
+### Implemented Features
 * **F1 - User Registration:** Clients can register, but accounts are marked as 'pending' (state 0) by default.
 * **F2 - Authentication:** Secure login. Access is granted only to users approved by an Administrator.
 * **F3 - Echo & Info Retrieval:** `ECHO <msg>` and `GET_INFO` commands for testing the blocking data flow.
@@ -34,7 +34,7 @@ Currently, the project has advanced to **Phase 2**. It maintains a **Multi-Clien
 └── README.md
 ```
 
-## ⚙️ How to Compile and Run
+## How to Compile and Run
 
 ### 1. Compile the Source Code
 Navigate to the `ccord_f2` directory and compile the project:
@@ -58,7 +58,7 @@ cd ccord_f2
 ```
 *(Follow the interactive terminal menu to Register, Login, and use the new F4/F5/F6 commands).*
 
-## 👥 The Team
+## The Team
 Following a team restructuring, this phase was developed by a 3-member team:
 * **Team & Software Manager:** Gonçalo Peres (Architecture, Planning, Testing, Reporting)
 * **Development Team:** Dinis Madeira & Gabriel da Cruz (C Implementation F4, F5, F6)
