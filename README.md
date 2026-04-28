@@ -1,4 +1,4 @@
-# C-Cord 💬
+# C-Cord
 
 **C-Cord** is a simplified, Discord-like client-server communication platform built in C. 
 This project is being developed for the **Computer Networks (Redes de Computadores)** course at the University of Coimbra (2025/2026).
