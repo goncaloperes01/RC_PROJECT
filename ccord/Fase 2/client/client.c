@@ -7,39 +7,71 @@
 #define PORT 9000
 #define BUF_SIZE 1024
 
-// Cores ANSI usadas para melhorar a experiência do utilizador no terminal
+// Códigos ANSI para dar cor ao texto no terminal
 #define GREEN "\033[0;32m"
 #define RED "\033[0;31m"
 #define CYAN "\033[0;36m"
 #define YELLOW "\033[1;33m"
 #define RESET "\033[0m"
 
-// Função auxiliar que limpa o ecrã do terminal
-// (não afeta lógica de rede, apenas interface)
+// Limpa o ecrã do terminal
 void clear_screen() {
     system("clear");
 }
 
-// Função para pausar a execução até o utilizador carregar ENTER
-// usada para melhorar a navegação entre menus
+// Pausa o programa até o utilizador carregar ENTER
 void pause_screen() {
     printf("\nPressiona ENTER para continuar...");
     getchar();
 }
 
+// Cria uma ligação TCP ao servidor local, na porta definida
+int connect_to_server() {
+    int sock;
+    struct sockaddr_in server_addr;
+
+    // Cria o socket TCP do cliente
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sock < 0) {
+        perror("Erro ao criar socket");
+        return -1;
+    }
+
+    // Define o tipo de endereço e a porta do servidor
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+
+    // Converte o IP 127.0.0.1 para o formato usado pelos sockets
+    if (inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr) <= 0) {
+        perror("Erro no IP do servidor");
+        close(sock);
+        return -1;
+    }
+
+    // Tenta estabelecer ligação ao servidor
+    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Erro ao ligar ao servidor");
+        close(sock);
+        return -1;
+    }
+
+    return sock;
+}
+
 int main() {
+    int sock;
+    char buffer[BUF_SIZE];
 
-    int sock; // descritor do socket usado para comunicar com o servidor
-    struct sockaddr_in server_addr; // estrutura que define IP e porta do servidor
-    char buffer[BUF_SIZE]; // buffer onde são armazenadas mensagens enviadas/recebidas
+    int logged_in = 0;
+    char current_user[50] = "";
+    char current_pass[50] = "";
 
-    int logged_in = 0; // variável de estado que indica se o utilizador está autenticado
-    char current_user[50]; // guarda o username após login bem sucedido
-
-    // ciclo principal do cliente (permite múltiplas operações)
     while (1) {
 
-        // ---------- MENU INICIAL ----------
+        // =====================================================
+        // MENU INICIAL: REGISTER, LOGIN OU EXIT
+        // =====================================================
         if (!logged_in) {
             clear_screen();
 
@@ -62,50 +94,64 @@ int main() {
                 break;
             }
 
-            printf("\nUsername: ");
-            fgets(username, 50, stdin);
-            username[strcspn(username, "\n")] = 0;
-
-            printf("Password: ");
-            fgets(password, 50, stdin);
-            password[strcspn(password, "\n")] = 0;
-
-            sock = socket(AF_INET, SOCK_STREAM, 0);
-
-            server_addr.sin_family = AF_INET;
-            server_addr.sin_port = htons(PORT);
-            inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
-
-            connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
-
-            if (option == 1) {
-                sprintf(buffer, "REGISTER %s %s", username, password);
-            } else if (option == 2) {
-                sprintf(buffer, "LOGIN %s %s", username, password);
-            } else {
+            if (option != 1 && option != 2) {
                 printf(RED "Opção inválida!\n" RESET);
                 pause_screen();
                 continue;
             }
 
+            // Lê as credenciais introduzidas pelo utilizador
+            printf("\nUsername: ");
+            fgets(username, sizeof(username), stdin);
+            username[strcspn(username, "\n")] = 0;
+
+            printf("Password: ");
+            fgets(password, sizeof(password), stdin);
+            password[strcspn(password, "\n")] = 0;
+
+            // Liga ao servidor para enviar o pedido escolhido
+            sock = connect_to_server();
+
+            if (sock < 0) {
+                pause_screen();
+                continue;
+            }
+
+            // Monta o comando a enviar ao servidor
+            if (option == 1) {
+                snprintf(buffer, sizeof(buffer), "REGISTER %s %s", username, password);
+            }
+            else {
+                snprintf(buffer, sizeof(buffer), "LOGIN %s %s", username, password);
+            }
+
             send(sock, buffer, strlen(buffer), 0);
 
             int n = recv(sock, buffer, BUF_SIZE - 1, 0);
+
             if (n > 0) {
                 buffer[n] = '\0';
 
+                // Interpreta a resposta enviada pelo servidor
                 if (strstr(buffer, "REGISTERED")) {
                     printf(GREEN "✔ Registo feito com sucesso!\n" RESET);
+                    printf(YELLOW "A tua conta ficou pendente. Precisa de aprovação do admin.\n" RESET);
                 }
                 else if (strstr(buffer, "USER_EXISTS")) {
                     printf(RED "✖ Utilizador já existe!\n" RESET);
                 }
+                else if (strstr(buffer, "RESERVED_USER")) {
+                    printf(RED "✖ O username 'admin' está reservado!\n" RESET);
+                }
                 else if (strstr(buffer, "LOGIN_OK")) {
                     printf(GREEN "✔ Login bem sucedido!\n" RESET);
+
+                    // Guarda o utilizador atual para pedidos futuros
                     logged_in = 1;
                     strcpy(current_user, username);
+                    strcpy(current_pass, password);
                 }
-                else if (strstr(buffer, "NOT_APPROVED")) { // F5
+                else if (strstr(buffer, "NOT_APPROVED")) {
                     printf(YELLOW "⏳ Conta ainda não foi aprovada pelo admin!\n" RESET);
                 }
                 else if (strstr(buffer, "LOGIN_FAIL")) {
@@ -120,7 +166,9 @@ int main() {
             pause_screen();
         }
 
-        // ---------- MENU APÓS LOGIN ----------
+        // =====================================================
+        // MENU APÓS LOGIN: FUNCIONALIDADES DO CLIENTE
+        // =====================================================
         else {
             clear_screen();
 
@@ -129,18 +177,18 @@ int main() {
             printf(CYAN "\n=========================\n");
             printf("     Bem-vindo %s\n", current_user);
             printf("=========================\n" RESET);
-            printf(" [1] ECHO (mensagem)\n");
+            printf(" [1] ECHO\n");
             printf(" [2] GET_INFO\n");
             printf(" [3] Logout\n");
-
-            // --------- F4: Novas opções ---------
             printf(" [4] LIST_ALL\n");
             printf(" [5] SEND\n");
             printf(" [6] CHECK_INBOX\n");
 
-            // --------- F6: Novas opções ---------
-            printf(" [7] APPROVE USER\n"); // F6
-            printf(" [8] DELETE USER\n");  // F6
+            // As opções de administração só aparecem para o utilizador admin
+            if (strcmp(current_user, "admin") == 0) {
+                printf(" [7] APPROVE USER\n");
+                printf(" [8] DELETE USER\n");
+            }
 
             printf("=========================\n");
             printf("Escolha: ");
@@ -150,71 +198,91 @@ int main() {
             if (option == 3) {
                 printf(YELLOW "Logout feito.\n" RESET);
                 logged_in = 0;
+                strcpy(current_user, "");
+                strcpy(current_pass, "");
                 pause_screen();
                 continue;
             }
 
-            sock = socket(AF_INET, SOCK_STREAM, 0);
+            // Cada opção abre uma nova ligação ao servidor
+            sock = connect_to_server();
 
-            server_addr.sin_family = AF_INET;
-            server_addr.sin_port = htons(PORT);
-            inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
+            if (sock < 0) {
+                pause_screen();
+                continue;
+            }
 
-            connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
-
+            // ECHO mensagem
             if (option == 1) {
                 char msg[900];
 
                 printf("\nMensagem: ");
-                fgets(msg, 900, stdin);
+                fgets(msg, sizeof(msg), stdin);
                 msg[strcspn(msg, "\n")] = 0;
 
-                sprintf(buffer, "ECHO %s", msg);
+                snprintf(buffer, sizeof(buffer), "ECHO %s", msg);
             }
+            // GET_INFO
             else if (option == 2) {
-                sprintf(buffer, "GET_INFO");
+                snprintf(buffer, sizeof(buffer), "GET_INFO");
             }
+
+            // LIST_ALL username password
             else if (option == 4) {
-                sprintf(buffer, "LIST_ALL");
+                snprintf(buffer, sizeof(buffer),
+                         "LIST_ALL %s %s",
+                         current_user, current_pass);
             }
+
+            // SEND sender password receiver message
             else if (option == 5) {
                 char dest[50];
                 char msg[900];
 
                 printf("Enviar para: ");
-                fgets(dest, 50, stdin);
+                fgets(dest, sizeof(dest), stdin);
                 dest[strcspn(dest, "\n")] = 0;
 
                 printf("Mensagem: ");
-                fgets(msg, 900, stdin);
+                fgets(msg, sizeof(msg), stdin);
                 msg[strcspn(msg, "\n")] = 0;
 
-                sprintf(buffer, "SEND %s %s %s", current_user, dest, msg);
-            }
-            else if (option == 6) {
-                sprintf(buffer, "CHECK_INBOX %s", current_user);
+                snprintf(buffer, sizeof(buffer),
+                         "SEND %s %s %s %s",
+                         current_user, current_pass, dest, msg);
             }
 
-            // --------- F6: APPROVE USER ---------
-            else if (option == 7) {
+            // CHECK_INBOX username password
+            else if (option == 6) {
+                snprintf(buffer, sizeof(buffer),
+                         "CHECK_INBOX %s %s",
+                         current_user, current_pass);
+            }
+
+            // APPROVE_USER admin password target_user
+            else if (option == 7 && strcmp(current_user, "admin") == 0) {
                 char user[50];
 
                 printf("User a aprovar: ");
-                fgets(user, 50, stdin);
+                fgets(user, sizeof(user), stdin);
                 user[strcspn(user, "\n")] = 0;
 
-                sprintf(buffer, "APPROVE_USER %s %s", current_user, user);
+                snprintf(buffer, sizeof(buffer),
+                         "APPROVE_USER %s %s %s",
+                         current_user, current_pass, user);
             }
 
-            // --------- F6: DELETE USER ---------
-            else if (option == 8) {
+            // DELETE_USER admin password target_user
+            else if (option == 8 && strcmp(current_user, "admin") == 0) {
                 char user[50];
 
                 printf("User a apagar: ");
-                fgets(user, 50, stdin);
+                fgets(user, sizeof(user), stdin);
                 user[strcspn(user, "\n")] = 0;
 
-                sprintf(buffer, "DELETE_USER %s %s", current_user, user);
+                snprintf(buffer, sizeof(buffer),
+                         "DELETE_USER %s %s %s",
+                         current_user, current_pass, user);
             }
 
             else {
@@ -224,14 +292,19 @@ int main() {
                 continue;
             }
 
+            // Envia o comando montado para o servidor
             send(sock, buffer, strlen(buffer), 0);
 
             int n = recv(sock, buffer, BUF_SIZE - 1, 0);
+
             if (n > 0) {
                 buffer[n] = '\0';
 
-                // --------- F6: respostas ---------
-                if (strstr(buffer, "NOT_ADMIN")) {
+                // Mostra uma mensagem adequada consoante a resposta do servidor
+                if (strstr(buffer, "AUTH_FAIL")) {
+                    printf(RED "✖ Autenticação falhou. Faz login novamente.\n" RESET);
+                }
+                else if (strstr(buffer, "NOT_ADMIN")) {
                     printf(RED "✖ Apenas o admin pode fazer isso!\n" RESET);
                 }
                 else if (strstr(buffer, "USER_APPROVED")) {
@@ -242,6 +315,15 @@ int main() {
                 }
                 else if (strstr(buffer, "USER_NOT_FOUND")) {
                     printf(RED "✖ Utilizador não encontrado!\n" RESET);
+                }
+                else if (strstr(buffer, "CANNOT_DELETE_ADMIN")) {
+                    printf(RED "✖ Não é permitido apagar o admin!\n" RESET);
+                }
+                else if (strstr(buffer, "MSG_STORED")) {
+                    printf(GREEN "✔ Mensagem guardada no servidor!\n" RESET);
+                }
+                else if (strstr(buffer, "INVALID_FORMAT")) {
+                    printf(RED "✖ Formato de comando inválido!\n" RESET);
                 }
                 else {
                     printf(GREEN "\nResposta do servidor:\n%s\n" RESET, buffer);
