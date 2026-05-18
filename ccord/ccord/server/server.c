@@ -122,7 +122,8 @@ int is_admin_client(int idx) {
     return clients[idx].logged_in && strcmp(clients[idx].username, "admin") == 0;
 }
 
-void list_all_users(int client_fd) {
+
+void list_all_users(int client_fd, int show_pending) {
     FILE *file = fopen(USERS_FILE, "r");
 
     if (!file) {
@@ -133,23 +134,54 @@ void list_all_users(int client_fd) {
     char line[300];
     char user[100], pass[100];
     int status;
-    char response[BUF_SIZE] = "Utilizadores aprovados:\n";
-    int count = 0;
+
+    char approved[BUF_SIZE] = "Utilizadores aprovados:\n";
+    char pending[BUF_SIZE] = "Utilizadores por aprovar:\n";
+
+    int approved_count = 0;
+    int pending_count = 0;
 
     while (fgets(line, sizeof(line), file)) {
-        if (parse_user_line(line, user, pass, &status) && status == 1) {
-            if (strlen(response) + strlen(user) + 4 < BUF_SIZE) {
-                strcat(response, "- ");
-                strcat(response, user);
-                strcat(response, "\n");
+        if (sscanf(line, "%99s %99s %d", user, pass, &status) == 3) {
+            if (status == 1) {
+                strcat(approved, "\n- ");
+                strcat(approved, user);
+            } 
+            else if (status == 0 && show_pending) {
+                strcat(pending, "\n- ");
+                strcat(pending, user);
+                pending_count++;
             }
-            count++;
+
+            if (status == 1) {
+                approved_count++;
+            }
         }
     }
 
     fclose(file);
 
-    if (count == 0) strcpy(response, "Sem utilizadores aprovados\n");
+    char response[BUF_SIZE * 2];
+    response[0] = '\0';
+
+    if (approved_count == 0) {
+        strcat(response, "Sem utilizadores aprovados\n");
+    } else {
+        strcat(response, approved);
+        strcat(response, "\n");
+    }
+
+    if (show_pending) {
+        strcat(response, "\n");
+
+        if (pending_count == 0) {
+            strcat(response, "Sem utilizadores por aprovar\n");
+        } else {
+            strcat(response, pending);
+            strcat(response, "\n");
+        }
+    }
+
     send_response(client_fd, response);
 }
 
@@ -348,27 +380,55 @@ void handle_join(int idx, const char *channel_arg) {
         return;
     }
 
-    char channel[MAX_CHANNEL];
-    if (channel_arg[0] == '#') {
-        snprintf(channel, sizeof(channel), "%s", channel_arg);
-    } else {
-        snprintf(channel, sizeof(channel), "#%s", channel_arg);
+    char clean[MAX_CHANNEL];
+
+    // Normalização do canal:
+    // /join general   -> #general
+    // /join #general  -> #general
+    // /join ##general -> #general
+    while (*channel_arg == '#') {
+        channel_arg++;
     }
 
-    if (strlen(clients[idx].current_channel) > 0) {
+    if (channel_arg[0] == '\0') {
+        send_response(clients[idx].fd, "Nome de canal inválido\n");
+        return;
+    }
+
+    snprintf(clean, sizeof(clean), "#%s", channel_arg);
+
+    // Se já estava noutro canal, avisa o canal antigo.
+    // Não avisa saída se o user fizer join ao mesmo canal outra vez.
+    if (strlen(clients[idx].current_channel) > 0 &&
+        strcmp(clients[idx].current_channel, clean) != 0) {
+
         char old_msg[200];
-        snprintf(old_msg, sizeof(old_msg), "[SERVER] %s saiu do canal %s\n", clients[idx].username, clients[idx].current_channel);
+        snprintf(old_msg, sizeof(old_msg),
+                 "[SERVER] %s saiu do canal %s\n",
+                 clients[idx].username,
+                 clients[idx].current_channel);
+
         broadcast_to_channel(clients[idx].current_channel, old_msg);
     }
 
-    snprintf(clients[idx].current_channel, sizeof(clients[idx].current_channel), "%s", channel);
+    snprintf(clients[idx].current_channel,
+             sizeof(clients[idx].current_channel),
+             "%s",
+             clean);
 
     char response[200];
-    snprintf(response, sizeof(response), "[SERVER] Entraste no canal %s\n", clients[idx].current_channel);
+    snprintf(response, sizeof(response),
+             "[SERVER] Entraste no canal %s\n",
+             clients[idx].current_channel);
+
     send_response(clients[idx].fd, response);
 
     char join_msg[200];
-    snprintf(join_msg, sizeof(join_msg), "[SERVER] %s entrou no canal %s\n", clients[idx].username, clients[idx].current_channel);
+    snprintf(join_msg, sizeof(join_msg),
+             "[SERVER] %s entrou no canal %s\n",
+             clients[idx].username,
+             clients[idx].current_channel);
+
     broadcast_to_channel(clients[idx].current_channel, join_msg);
 }
 
@@ -554,16 +614,16 @@ void process_command(int idx, char *buffer, time_t start_time) {
 
         if (sscanf(buffer, "LIST_ALL %49s %49s", username, password) == 2) {
             if (check_login(username, password) != 1) send_response(clients[idx].fd, "AUTH_FAIL\n");
-            else list_all_users(clients[idx].fd);
+            else list_all_users(clients[idx].fd, is_admin_client(idx));
         } else if (clients[idx].logged_in) {
-            list_all_users(clients[idx].fd);
+            list_all_users(clients[idx].fd, is_admin_client(idx));
         } else {
             send_response(clients[idx].fd, "AUTH_REQUIRED\n");
         }
     }
     else if (strcmp(command, "/list_all") == 0) {
         if (!clients[idx].logged_in) send_response(clients[idx].fd, "AUTH_REQUIRED\n");
-        else list_all_users(clients[idx].fd);
+        else list_all_users(clients[idx].fd, is_admin_client(idx));
     }
     else if (strcmp(command, "SEND") == 0) {
         char sender[50], password[50], receiver[50], message[900];
@@ -719,7 +779,7 @@ int main(void) {
     }
 
     printf("Servidor Phase 3 à escuta na porta %d...\n", PORT);
-    printf("Usa vários terminais com ./client para testar.\n");
+    printf("Usa vários terminais com ./client_phase3 para testar.\n");
 
     while (1) {
         fd_set read_fds;
