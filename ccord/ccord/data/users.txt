@@ -1,0 +1,4 @@
+admin admin 1
+dinis 123 1
+gabi 1234 1
+2 2 0
