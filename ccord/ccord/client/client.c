@@ -248,7 +248,7 @@ void receive_udp_file(int udp_sock) {
 
 void print_chat_help(void) {
     printf(CYAN "\nComandos Phase 3:\n" RESET);
-    printf("  /join #general              entrar num canal\n");
+    printf("  /join #general              entrar num canal (/join general também funciona)\n");
     printf("  /msg mensagem               enviar mensagem ao canal atual\n");
     printf("  texto normal                também envia ao canal atual\n");
     printf("  /who                        ver users no canal atual\n");
